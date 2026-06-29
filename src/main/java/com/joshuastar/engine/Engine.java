@@ -29,7 +29,9 @@ public class Engine {
     private float velocityZ = 0f;
 
     private static final float PLAYER_WIDTH = 0.6f;
-    private boolean spaceWasPressed = false;
+private boolean spaceWasPressed = false;
+    private boolean eWasPressed = false;
+    private boolean inventoryOpen = false;
     private static final float PLAYER_HEIGHT = 1.8f;
     private static final float PLAYER_EYE_HEIGHT = 1.62f;
 
@@ -98,19 +100,37 @@ public class Engine {
             lastMouseX = mouseX;
             lastMouseY = mouseY;
 
-            renderer.getCamera().rotate(
-                    (float) deltaX * 0.15f,
-                    (float) -deltaY * 0.15f);
+            if (!inventoryOpen) {
+                renderer.getCamera().rotate(
+                        (float) deltaX * 0.15f,
+                        (float) -deltaY * 0.15f);
+            }
             if (input.isKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
                 GLFW.glfwSetWindowShouldClose(window.getHandle(), true);
             }
-
             boolean gPressed = input.isKeyPressed(GLFW.GLFW_KEY_G);
             if (gPressed && !gWasPressed) {
                 flying = !flying;
                 velocityY = 0f;
             }
             gWasPressed = gPressed;
+            boolean ePressed = input.isKeyPressed(GLFW.GLFW_KEY_E);
+            if (ePressed && !eWasPressed) {
+                inventoryOpen = !inventoryOpen;
+                GLFW.glfwSetInputMode(
+                        window.getHandle(),
+                        GLFW.GLFW_CURSOR,
+                        inventoryOpen ? GLFW.GLFW_CURSOR_NORMAL : GLFW.GLFW_CURSOR_DISABLED);
+                if (!inventoryOpen) {
+                    firstMouse = true;
+                }
+            }
+            eWasPressed = ePressed;
+
+            int hotbarKey = input.getPressedHotbarKey();
+            if (hotbarKey != -1) {
+                player.getInventory().setSelectedHotbarSlot(hotbarKey);
+            }
 
             com.joshuastar.world.World world = renderer.getVulkanRenderer().getWorld();
             Camera cam = renderer.getCamera();
@@ -210,20 +230,22 @@ public class Engine {
                 velocityX *= friction;
                 velocityZ *= friction;
             }
-            boolean leftPressed = input.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+boolean leftPressed = input.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_LEFT);
             boolean rightPressed = input.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 
-            if (leftPressed && !leftWasPressed) {
-                handleBreak();
-            }
+            if (!inventoryOpen) {
+                if (leftPressed && !leftWasPressed) {
+                    handleBreak();
+                }
 
-            if (rightPressed && !rightWasPressed) {
-                handlePlace();
+                if (rightPressed && !rightWasPressed) {
+                    handlePlace();
+                }
             }
 
             leftWasPressed = leftPressed;
             rightWasPressed = rightPressed;
-            renderer.render();
+            renderer.render(player, inventoryOpen);
 
             window.pollEvents();
         }
@@ -347,14 +369,18 @@ public class Engine {
         if (hit == null || hit.px == Integer.MIN_VALUE)
             return;
 
-        if (intersectsPlayer(cam, hit.px, hit.py, hit.pz))
+if (intersectsPlayer(cam, hit.px, hit.py, hit.pz))
             return;
 
-        w.setBlock(hit.px, hit.py, hit.pz, (short) 1);
+        short placeId = player.getInventory().getSelectedItemId();
+        if (placeId == 0) {
+            return;
+        }
+
+        w.setBlock(hit.px, hit.py, hit.pz, placeId);
 
         rebuildAffectedChunks(hit.px, hit.pz);
     }
-
     private boolean intersectsPlayer(Camera cam, int bx, int by, int bz) {
 
         float half = PLAYER_WIDTH / 2f;

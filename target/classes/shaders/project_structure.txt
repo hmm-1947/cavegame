@@ -8,7 +8,9 @@ shaders
 ├── line.vert
 ├── line.vert.spv
 ├── mob.frag
+├── mob.frag.spv
 ├── mob.vert
+├── mob.vert.spv
 ├── shadow.frag
 ├── shadow.frag.spv
 ├── shadow.vert
@@ -16,4 +18,6 @@ shaders
 ├── triangle.frag
 ├── triangle.frag.spv
 ├── triangle.vert
-└── triangle.vert.spv
+├── triangle.vert.spv
+├── ui.frag
+└── ui.vert

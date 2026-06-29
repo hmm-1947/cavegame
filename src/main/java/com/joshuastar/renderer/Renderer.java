@@ -16,8 +16,8 @@ public class Renderer {
         vulkanRenderer.init(window);
     }
 
-    public void render() {
-        vulkanRenderer.render(camera);
+public void render(com.joshuastar.entity.Player player, boolean inventoryOpen) {
+        vulkanRenderer.render(camera, player, inventoryOpen);
     }
 
     public void cleanup() {

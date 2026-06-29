@@ -53,12 +53,9 @@ void main()
         cascadeIndex = 2;
 
     float shadow = sampleShadow(cascadeIndex);
+float brightness = fragShade;
 
-float brightness = max(fragShade, 0.12);
-
-float ambient = 0.45;
-
-float lighting = max(brightness * mix(0.6, 1.0, shadow), ambient);
+float lighting = brightness * mix(0.6, 1.0, shadow);
 
 outColor = vec4(texColor.rgb * lighting, texColor.a);
 }

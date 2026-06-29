@@ -31,13 +31,13 @@ poolSizes.get(0)
 
 poolSizes.get(1)
         .type(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        .descriptorCount(4);
+        .descriptorCount(5);
 
             VkDescriptorPoolCreateInfo poolInfo =
                     VkDescriptorPoolCreateInfo.calloc(stack)
                             .sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
                 .pPoolSizes(poolSizes)
-                            .maxSets(2);
+                            .maxSets(3);
 
             LongBuffer pPool = stack.mallocLong(1);
 

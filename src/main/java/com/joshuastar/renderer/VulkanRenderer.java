@@ -111,11 +111,17 @@ public class VulkanRenderer {
         private VulkanShadowPipeline shadowPipeline;
         private final org.joml.Vector3f lightDirection = new org.joml.Vector3f(0.4f, -1.0f, 0.3f).normalize();
 
-        private MobManager mobManager;
+private MobManager mobManager;
         private com.joshuastar.renderer.vulkan.VulkanMobPipeline mobPipeline;
         private VulkanTexture cowTexture;
         private com.joshuastar.renderer.vulkan.VulkanMesh cowMesh;
 
+        private com.joshuastar.renderer.vulkan.VulkanUIDescriptorSetLayout uiDescriptorSetLayout;
+        private com.joshuastar.renderer.vulkan.VulkanUIPipeline uiPipeline;
+        private com.joshuastar.renderer.vulkan.VulkanUIDescriptorSet uiDescriptorSet;
+        private VulkanBuffer uiVertexBuffer;
+        private VulkanBuffer uiIndexBuffer;
+        private static final int UI_MAX_QUADS = 256;
         public void init(Window window) {
                 context = new VulkanContext();
                 context.create(window.getHandle());
@@ -153,16 +159,17 @@ public class VulkanRenderer {
                 commandBuffers.create(device, context.getQueueFamilies());
 
                 String[] tilePaths = new String[TextureAtlas.ATLAS_SIZE * TextureAtlas.ATLAS_SIZE];
-                tilePaths[0] = "/textures/top.png";
+tilePaths[0] = "/textures/top.png";
                 tilePaths[2] = "/textures/side.png";
-                tilePaths[3] = "/textures/side.png";
-                tilePaths[4] = "/textures/side.png";
+                tilePaths[3] = "/textures/dirt.png";
+                tilePaths[4] = "/textures/stone.png";
                 tilePaths[5] = "/textures/side.png";
                 tilePaths[6] = "/textures/sand.png";
                 tilePaths[7] = "/textures/snow.png";
                 tilePaths[8] = "/textures/log_top.png";
                 tilePaths[9] = "/textures/log_side.png";
                 tilePaths[10] = "/textures/leaves.png";
+                tilePaths[11] = "/textures/white.png";
 
                 BufferedImage img = TextureLoader.buildAtlas(tilePaths, 16, TextureAtlas.ATLAS_SIZE);
                 byte[] pixels = TextureLoader.loadRGBA(img);
@@ -323,12 +330,37 @@ public class VulkanRenderer {
                                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-                crosshairVertexBuffer.upload(device, crosshairData);
-                System.out.println(
-                                TextureLoader.load("/textures/terrain.png"));
-        }
+crosshairVertexBuffer.upload(device, crosshairData);
 
-        public void render(Camera camera) {
+                uiDescriptorSetLayout = new com.joshuastar.renderer.vulkan.VulkanUIDescriptorSetLayout();
+                uiDescriptorSetLayout.create(device);
+
+                uiPipeline = new com.joshuastar.renderer.vulkan.VulkanUIPipeline();
+                uiPipeline.create(device, renderPass.getRenderPass(), uiDescriptorSetLayout.getDescriptorSetLayout());
+
+                uiDescriptorSet = new com.joshuastar.renderer.vulkan.VulkanUIDescriptorSet();
+                uiDescriptorSet.create(device, descriptorPool, uiDescriptorSetLayout, texture);
+
+                int uiVertexCapacity = UI_MAX_QUADS * 4 * com.joshuastar.renderer.UIVertex.BYTES;
+                int uiIndexCapacity = UI_MAX_QUADS * 6 * Integer.BYTES;
+
+                uiVertexBuffer = new VulkanBuffer();
+                uiVertexBuffer.create(
+                                context.getPhysicalDevice(),
+                                device,
+                                uiVertexCapacity,
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+                uiIndexBuffer = new VulkanBuffer();
+                uiIndexBuffer.create(
+                                context.getPhysicalDevice(),
+                                device,
+                                uiIndexCapacity,
+                                org.lwjgl.vulkan.VK10.VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        }
+public void render(Camera camera, com.joshuastar.entity.Player player, boolean inventoryOpen) {
                 VkDevice device = context.getDevice();
 
                 try (MemoryStack stack = stackPush()) {
@@ -344,7 +376,7 @@ public class VulkanRenderer {
                                         com.joshuastar.world.Chunk.SIZE_Z);
                        chunkManager.update(playerChunkX, playerChunkZ, 5);
                         mobManager.update(1.0f / 60.0f);
-
+rebuildUIMesh(player, inventoryOpen);
                         IntBuffer pImageIndex = stack.ints(0);
                         vkAcquireNextImageKHR(device, swapChain.getSwapChain(), Long.MAX_VALUE,
                                         syncObjects.getImageAvailableSemaphore(), VK_NULL_HANDLE, pImageIndex);
@@ -620,7 +652,36 @@ for (java.util.Map.Entry<Long, com.joshuastar.renderer.vulkan.VulkanMesh> entry 
 
                                 MemoryUtil.memFree(pc);
                         }
+if (!uiIndices.isEmpty()) {
 
+                                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                uiPipeline.getPipeline());
+
+                                java.nio.ByteBuffer uiTint = MemoryUtil.memAlloc(16);
+                                uiTint.putFloat(0, 1.0f);
+                                uiTint.putFloat(4, 1.0f);
+                                uiTint.putFloat(8, 1.0f);
+                                uiTint.putFloat(12, 1.0f);
+                                uiTint.rewind();
+
+                                vkCmdPushConstants(commandBuffer, uiPipeline.getPipelineLayout(),
+                                                VK_SHADER_STAGE_FRAGMENT_BIT, 0, uiTint);
+
+                                LongBuffer uiVertexBuffers = stack.longs(uiVertexBuffer.getBuffer());
+                                LongBuffer uiOffsets = stack.longs(0);
+                                vkCmdBindVertexBuffers(commandBuffer, 0, uiVertexBuffers, uiOffsets);
+
+                                vkCmdBindIndexBuffer(commandBuffer, uiIndexBuffer.getBuffer(), 0,
+                                                VK_INDEX_TYPE_UINT32);
+
+                                LongBuffer uiSets = stack.longs(uiDescriptorSet.getDescriptorSet());
+                                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                uiPipeline.getPipelineLayout(), 0, uiSets, null);
+
+                                vkCmdDrawIndexed(commandBuffer, uiIndices.size(), 1, 0, 0, 0);
+
+                                MemoryUtil.memFree(uiTint);
+                        }
                         java.nio.ByteBuffer crosshairColor = MemoryUtil.memAlloc(16);
                         crosshairColor.putFloat(0, 0.0f);
                         crosshairColor.putFloat(4, 0.0f);
@@ -842,8 +903,16 @@ for (java.util.Map.Entry<Long, com.joshuastar.renderer.vulkan.VulkanMesh> entry 
                                 crosshairPipeline.destroy(device);
                         if (outlineVertexBuffer != null)
                                 outlineVertexBuffer.destroy(device);
-                        if (crosshairVertexBuffer != null)
+                  if (crosshairVertexBuffer != null)
                                 crosshairVertexBuffer.destroy(device);
+                        if (uiPipeline != null)
+                                uiPipeline.destroy(device);
+                        if (uiDescriptorSetLayout != null)
+                                uiDescriptorSetLayout.destroy(device);
+                        if (uiVertexBuffer != null)
+                                uiVertexBuffer.destroy(device);
+                        if (uiIndexBuffer != null)
+                                uiIndexBuffer.destroy(device);
                         if (renderPass != null)
                                 renderPass.destroy(device);
                         if (imageViews != null)
@@ -859,7 +928,171 @@ for (java.util.Map.Entry<Long, com.joshuastar.renderer.vulkan.VulkanMesh> entry 
                                 uniformBuffer.destroy(device);
                 }
         }
+private static final int ICON_WHITE_TILE = 11;
 
+        private int iconTileForItem(short id) {
+                switch (id) {
+                        case 1: return 0;
+                        case 2: return 3;
+                        case 3: return 4;
+                        case 7: return 8;
+                        case 8: return 10;
+                        default: return ICON_WHITE_TILE;
+                }
+        }
+
+        private java.util.List<com.joshuastar.renderer.UIVertex> uiVerts = new java.util.ArrayList<>();
+        private java.util.List<Integer> uiIndices = new java.util.ArrayList<>();
+
+        private void addUIQuad(float x0, float y0, float x1, float y1, int tile) {
+
+                float u0 = TextureAtlas.getU0(tile);
+                float v0 = TextureAtlas.getV0(tile);
+                float u1 = TextureAtlas.getU1(tile);
+                float v1 = TextureAtlas.getV1(tile);
+
+                int start = uiVerts.size();
+
+                uiVerts.add(new com.joshuastar.renderer.UIVertex(x0, y0, u0, v0));
+                uiVerts.add(new com.joshuastar.renderer.UIVertex(x1, y0, u1, v0));
+                uiVerts.add(new com.joshuastar.renderer.UIVertex(x1, y1, u1, v1));
+                uiVerts.add(new com.joshuastar.renderer.UIVertex(x0, y1, u0, v1));
+
+                uiIndices.add(start);
+                uiIndices.add(start + 1);
+                uiIndices.add(start + 2);
+
+                uiIndices.add(start + 2);
+                uiIndices.add(start + 3);
+                uiIndices.add(start);
+        }
+
+        private void buildHotbarMesh(com.joshuastar.entity.Player player) {
+
+                int slots = com.joshuastar.world.Inventory.HOTBAR_SIZE;
+                float slotSize = 0.11f;
+                float gap = 0.012f;
+                float totalWidth = slots * slotSize + (slots - 1) * gap;
+                float startX = -totalWidth / 2.0f;
+                float y0 = 0.84f;
+                float y1 = y0 + slotSize;
+
+                com.joshuastar.world.Inventory inv = player.getInventory();
+
+                for (int i = 0; i < slots; i++) {
+
+                        float x0 = startX + i * (slotSize + gap);
+                        float x1 = x0 + slotSize;
+
+                        addUIQuad(x0, y0, x1, y1, ICON_WHITE_TILE);
+
+                        short id = inv.getItemId(i);
+                        if (id != 0) {
+                                float pad = slotSize * 0.18f;
+                                addUIQuad(x0 + pad, y0 + pad, x1 - pad, y1 - pad, iconTileForItem(id));
+                        }
+
+                        if (i == inv.getSelectedHotbarSlot()) {
+                                float hb = 0.012f;
+                                addUIQuad(x0 - hb, y0 - hb, x0, y1 + hb, ICON_WHITE_TILE);
+                                addUIQuad(x1, y0 - hb, x1 + hb, y1 + hb, ICON_WHITE_TILE);
+                                addUIQuad(x0 - hb, y0 - hb, x1 + hb, y0, ICON_WHITE_TILE);
+                                addUIQuad(x0 - hb, y1, x1 + hb, y1 + hb, ICON_WHITE_TILE);
+                        }
+                }
+        }
+
+        private void buildInventoryMesh(com.joshuastar.entity.Player player) {
+
+                com.joshuastar.world.Inventory inv = player.getInventory();
+
+                addUIQuad(-0.55f, -0.5f, 0.55f, 0.5f, ICON_WHITE_TILE);
+
+                int cols = 9;
+                int mainRows = 3;
+                float slotSize = 0.1f;
+                float gap = 0.01f;
+                float gridWidth = cols * slotSize + (cols - 1) * gap;
+                float startX = -gridWidth / 2.0f;
+
+                float mainStartY = -0.05f;
+
+                for (int row = 0; row < mainRows; row++) {
+                        for (int col = 0; col < cols; col++) {
+
+                                int slot = com.joshuastar.world.Inventory.HOTBAR_SIZE + row * cols + col;
+
+                                float x0 = startX + col * (slotSize + gap);
+                                float x1 = x0 + slotSize;
+                                float y0 = mainStartY + row * (slotSize + gap);
+                                float y1 = y0 + slotSize;
+
+                                addUIQuad(x0, y0, x1, y1, ICON_WHITE_TILE);
+
+                                short id = inv.getItemId(slot);
+                                if (id != 0) {
+                                        float pad = slotSize * 0.18f;
+                                        addUIQuad(x0 + pad, y0 + pad, x1 - pad, y1 - pad, iconTileForItem(id));
+                                }
+                        }
+                }
+
+                float hotbarY0 = mainStartY + mainRows * (slotSize + gap) + 0.03f;
+
+                for (int col = 0; col < cols; col++) {
+
+                        float x0 = startX + col * (slotSize + gap);
+                        float x1 = x0 + slotSize;
+                        float y0 = hotbarY0;
+                        float y1 = y0 + slotSize;
+
+                        addUIQuad(x0, y0, x1, y1, ICON_WHITE_TILE);
+
+                        short id = inv.getItemId(col);
+                        if (id != 0) {
+                                float pad = slotSize * 0.18f;
+                                addUIQuad(x0 + pad, y0 + pad, x1 - pad, y1 - pad, iconTileForItem(id));
+                        }
+                }
+        }
+
+        private void rebuildUIMesh(com.joshuastar.entity.Player player, boolean inventoryOpen) {
+
+                uiVerts.clear();
+                uiIndices.clear();
+
+                buildHotbarMesh(player);
+
+                if (inventoryOpen) {
+                        buildInventoryMesh(player);
+                }
+
+                if (uiVerts.isEmpty()) {
+                        return;
+                }
+
+                java.nio.ByteBuffer vertexData = java.nio.ByteBuffer
+                                .allocate(uiVerts.size() * com.joshuastar.renderer.UIVertex.BYTES)
+                                .order(java.nio.ByteOrder.nativeOrder());
+
+                for (com.joshuastar.renderer.UIVertex v : uiVerts) {
+                        vertexData.putFloat(v.getX());
+                        vertexData.putFloat(v.getY());
+                        vertexData.putFloat(v.getU());
+                        vertexData.putFloat(v.getV());
+                }
+
+                java.nio.ByteBuffer indexData = java.nio.ByteBuffer
+                                .allocate(uiIndices.size() * Integer.BYTES)
+                                .order(java.nio.ByteOrder.nativeOrder());
+
+                for (int idx : uiIndices) {
+                        indexData.putInt(idx);
+                }
+
+                uiVertexBuffer.upload(context.getDevice(), vertexData.array());
+                uiIndexBuffer.upload(context.getDevice(), indexData.array());
+        }
         public VulkanContext getContext() {
                 return context;
         }

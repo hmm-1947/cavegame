@@ -60,15 +60,17 @@ public class WorldGenerator {
                         noise.temperature(wx, wz),
                         noise.humidity(wx, wz));
 
-                for (int y = height - 3; y < height; y++) {
+                int dirtDepth = 3 + noise.dirtDepthVariation(wx, wz);
 
-                    if (y <= 0) {
-                        continue;
-                    }
 
-                    chunk.setBlock(x, y, z, (short) 2);
-                }
+for (int y = height - dirtDepth; y < height; y++) {
 
+    if (y <= 0) {
+        continue;
+    }
+
+    chunk.setBlock(x, y, z, (short) 2);
+}
                 chunk.setBlock(x, height, z, surfaceBlock);
 
                 if (surfaceBlock == 1

@@ -332,7 +332,9 @@ public double density(double x, double y, double z) {
     public int treeTrunkHeight(int x, int z) {
         return 4 + (int)(Math.abs(treeHash(x, z)) % 3);
     }
-
+public int dirtDepthVariation(int x, int z) {
+    return (int)(Math.abs(treeHash(x * 53 + 7, z * 97 + 19)) % 4);
+}
     private long treeHash(int x, int z) {
         long n = x * 668265263L + z * 374761393L + seed;
         n = (n << 13) ^ n;

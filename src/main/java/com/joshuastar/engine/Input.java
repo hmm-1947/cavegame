@@ -26,6 +26,15 @@ public class Input {
         return x[0];
     }
 
+    public int getPressedHotbarKey() {
+        for (int i = 0; i < 9; i++) {
+            if (isKeyPressed(GLFW.GLFW_KEY_1 + i)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public double getMouseY() {
         double[] x = new double[1];
         double[] y = new double[1];
