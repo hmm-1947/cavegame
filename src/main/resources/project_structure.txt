@@ -1,0 +1,32 @@
+resources
+├── shaders/
+│   ├── crosshair.frag
+│   ├── crosshair.frag.spv
+│   ├── crosshair.vert
+│   ├── crosshair.vert.spv
+│   ├── line.frag
+│   ├── line.frag.spv
+│   ├── line.vert
+│   ├── line.vert.spv
+│   ├── mob.frag
+│   ├── mob.frag.spv
+│   ├── mob.vert
+│   ├── mob.vert.spv
+│   ├── shadow.frag
+│   ├── shadow.frag.spv
+│   ├── shadow.vert
+│   ├── shadow.vert.spv
+│   ├── triangle.frag
+│   ├── triangle.frag.spv
+│   ├── triangle.vert
+│   └── triangle.vert.spv
+└── textures/
+    ├── cow.png
+    ├── leaves.png
+    ├── log_side.png
+    ├── log_top.png
+    ├── sand.png
+    ├── side.png
+    ├── snow.png
+    ├── terrain.png
+    └── top.png
