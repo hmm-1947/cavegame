@@ -40,11 +40,11 @@ private boolean spaceWasPressed = false;
     private static final float JUMP_MOTION = 0.42f;
     private static final float GROUND_SLIPPERINESS = 0.546f;
     private static final float AIR_FRICTION = 0.91f;
-    private static final float MOVE_SPEED = 0.026f;
+private static final float WALK_SPEED = 0.1f;
     private static final float SPRINT_MULTIPLIER = 1.3f;
     private static final float SNEAK_MULTIPLIER = 0.3f;
     private static final float STEP_HEIGHT = 0.6f;
-
+    private static final float TERMINAL_VELOCITY = -3.92f;
     public void run() {
         init();
         loop();
@@ -176,41 +176,43 @@ private boolean spaceWasPressed = false;
                 moveZAndCollide(world, cam, velocityZ);
                 moveYAndCollide(world, cam, velocityY);
 
-            } else {
+} else {
                 boolean onGround = isOnGround(world, cam);
 
-                float forwardInput = forward;
-                float strafeInput = strafe;
+                if (inputX != 0f || inputZ != 0f) {
 
-                float length = forwardInput * forwardInput + strafeInput * strafeInput;
-
-                if (length >= 1.0E-4F) {
-                    length = (float) Math.sqrt(length);
-
-                    if (length < 1.0f)
-                        length = 1.0f;
-
-                    float accel = MOVE_SPEED / length;
+                    float speed = WALK_SPEED;
 
                     if (input.isKeyPressed(GLFW.GLFW_KEY_LEFT_CONTROL))
-                        accel *= SPRINT_MULTIPLIER;
+                        speed *= SPRINT_MULTIPLIER;
 
                     if (input.isKeyPressed(GLFW.GLFW_KEY_LEFT_SHIFT))
-                        accel *= SNEAK_MULTIPLIER;
+                        speed *= SNEAK_MULTIPLIER;
 
-                    accel *= onGround ? 0.16277136F / (GROUND_SLIPPERINESS * GROUND_SLIPPERINESS * GROUND_SLIPPERINESS)
-                            : 0.02F / MOVE_SPEED;
+                  velocityX += inputX * speed;
+                    velocityZ += inputZ * speed;
+                }
 
-                    velocityX += inputX * accel;
-                    velocityZ += inputZ * accel;
+              float currentSpeedSq = velocityX * velocityX + velocityZ * velocityZ;
+                float effectiveMaxSpeed = WALK_SPEED * 3f;
+
+                if (input.isKeyPressed(GLFW.GLFW_KEY_LEFT_CONTROL)) {
+                    effectiveMaxSpeed *= SPRINT_MULTIPLIER;
+                }
+
+                float maxGroundSpeedSq = effectiveMaxSpeed * effectiveMaxSpeed;
+
+                if (!onGround && currentSpeedSq > maxGroundSpeedSq) {
+                    float scale = (float) Math.sqrt(maxGroundSpeedSq / currentSpeedSq);
+                    velocityX *= scale;
+                    velocityZ *= scale;
                 }
 
                 moveXAndCollide(world, cam, velocityX);
                 moveZAndCollide(world, cam, velocityZ);
+boolean spacePressed = input.isKeyPressed(GLFW.GLFW_KEY_SPACE);
 
-                boolean spacePressed = input.isKeyPressed(GLFW.GLFW_KEY_SPACE);
-
-                if (onGround && spacePressed && !spaceWasPressed) {
+                if (onGround && spacePressed) {
                     velocityY = 0.42f;
 
                     if (input.isKeyPressed(GLFW.GLFW_KEY_LEFT_CONTROL)) {
@@ -221,7 +223,12 @@ private boolean spaceWasPressed = false;
 
                 spaceWasPressed = spacePressed;
 
-                velocityY -= 0.08f;
+velocityY -= 0.08f;
+
+                if (velocityY < TERMINAL_VELOCITY) {
+                    velocityY = TERMINAL_VELOCITY;
+                }
+
                 moveYAndCollide(world, cam, velocityY);
                 velocityY *= 0.98f;
 
